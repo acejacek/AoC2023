@@ -5,11 +5,12 @@
 
 #define INPUT_FILE "day1.txt"
 
+// change for part 2:
 #define PART 1
 
-int is_digit(char* x)
+int is_digit(const char* x)
 {
-    char c = x[0];
+    const char c = x[0];
     if (isdigit(c)) return c - '0';
 
 #if PART == 2
@@ -27,8 +28,6 @@ int is_digit(char* x)
 
     return -1;
 }
-
-
 
 int main(void)
 {
@@ -48,38 +47,31 @@ int main(void)
    
     while ((read = getline(&line, &len, input)) != -1)
     {
-        int x = 0;
-        for (int i = 0; i < read; ++i)
+        char text[6];
+        int x = 0, res = -1;
+
+        for (int i = 0; res == -1; ++i)
         {
-            char text[6];
             strncpy(text, line + i, 5);
-            int res = is_digit(text);
-            if (res > -1)
-            {
-                x = res * 10;
-                break;
-            }
+            res = is_digit(text);
         }
 
-        for (int i = read; i >= 0; --i)
+        x = res * 10;
+        res = -1;
+
+        for (int i = read; res == -1; --i)
         {
-            char text[6];
             strncpy(text, line + i, 5);
-            int res = is_digit(text);
-            if (res > -1)
-            {
-                x += res;
-                break;
-            }
+            res = is_digit(text);
         }
 
-        printf("Calibration val: %d\n", x);
-
+        x += res;
         sum += x;
-
     }
 
-    printf("Cum of all calibration values is: %d\n", sum);
+    fclose(input);
+
+    printf("Sum of all calibration values is: %d\n", sum);
     return 0;
 }
 
