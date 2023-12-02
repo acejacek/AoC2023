@@ -19,7 +19,7 @@ int main(void)
     int game = 0;
     int sum = 0;
     int sum_of_powers = 0;
-    bool good_game = true;
+    bool good_game;
 
     char* line = NULL;
     size_t len = 0;
@@ -30,57 +30,36 @@ int main(void)
         game++;
         good_game = true;
 
-        int min_red = 0;
-        int min_green = 0;
-        int min_blue = 0;
-        int power = 0;
+        int red = 0, green = 0, blue = 0;
+        int min_red = 0, min_green = 0, min_blue = 0;
 
-        int blue = 0, green = 0, red = 0;
+        char* pos = strchr(line, ':') + 2; // skip Game 1:
 
-        char* pos = strchr(line, ':');
-        pos += 2;
-
-        char* sets[20];
-        int i = 0;
-        char* set = strtok(pos, ";");
-
+        char* cube = strtok(pos, " ,;");
         do {
-            printf("draft: %s\n", set);
-            sets[i++] = set;
-            set = strtok(NULL, ";");
-        }
-        while (set != NULL);  // split by drafts
-        
-        for (int n = 0; n < i; ++n)
-        {
-            char* cube = strtok(sets[n], " ,");
-            // printf("token: %s\n", cube);
-            do {
-                int value = atoi(cube);
+            int value = atoi(cube);  // first token is with value
 
-                cube = strtok(NULL, " ,");
-                if (cube[0] == 'b') blue = value;          
-                if (cube[0] == 'r') red = value;          
-                if (cube[0] == 'g') green = value;          
+            cube = strtok(NULL, " ,"); // second is with color
+            if (cube[0] == 'r') red = value;          
+            if (cube[0] == 'g') green = value;          
+            if (cube[0] == 'b') blue = value;          
 
-                if (red > 12 || 
-                        green > 13 ||
-                        blue > 14) good_game = false;
+            if (red > 12 || 
+                    green > 13 ||
+                    blue > 14) good_game = false;
 
-                if (min_red < red) min_red = red;
-                if (min_green < green) min_green = green;
-                if (min_blue < blue) min_blue = blue;
+            if (min_red < red) min_red = red;
+            if (min_green < green) min_green = green;
+            if (min_blue < blue) min_blue = blue;
 
-                cube = strtok(NULL, " ,");
+            cube = strtok(NULL, " ,");
 
-            } while(cube != NULL);
-        }
-        
-        // printf("red: %d, green: %d, blue: %d\n", red, green, blue);
+        } while(cube);
+
         if (good_game) sum += game;
-        power = min_red * min_green * min_blue;
-        sum_of_powers += power;
+        sum_of_powers += min_red * min_green * min_blue;
     }
+
     fclose(input);
 
     printf("Sum of IDs: %d\n", sum);
