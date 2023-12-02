@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <limits.h>
 
 #define INPUT_FILE "day2.txt"
 
@@ -52,9 +51,9 @@ int main(void)
             if (min_green < green) min_green = green;
             if (min_blue < blue) min_blue = blue;
 
-            cube = strtok(NULL, " ,");
-
-        } while(cube);
+            cube = strtok(NULL, " ,"); // get next token
+        }
+        while(cube);
 
         if (good_game) sum += game;
         sum_of_powers += min_red * min_green * min_blue;
