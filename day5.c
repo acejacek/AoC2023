@@ -29,7 +29,8 @@ int map_number(size_t* number, Mapping* map)
     if (*number < map->source ||
         *number > map->source + map->range - 1) return 0;   // not in range
 
-    *number -= map->source + map->dest;
+    *number -= map->source;
+    *number += map->dest;
     return 1;
 }
 
@@ -71,14 +72,12 @@ int main(void)
         num_str = strtok(NULL, " ");
     }
 
-
     int step = 0;
     while ((read = getline(&line, &len, input)) != -1)
     {
         if (islower(*line))
         {
             step++;
-            printf("%s", line);
             continue;
         }
 
@@ -95,30 +94,22 @@ int main(void)
     }
     fclose(input);
 
+    size_t lowest = SIZE_MAX;
+
 #if PART == 1
     for (size_t s = 0; s < seed_count; ++s)
         for (int st = 0; st <= step; ++st)
-        {
-            int unchanged = 1;
-
-            for (int m = 0; m < mapping_count && unchanged; ++m)
+            for (int m = 0; m < mapping_count ; ++m)
             {
                 if (mapping[m].step != st) continue;
                 if (map_number(&seeds[s].value, mapping + m))
-                {
-                    unchanged = 0;
                     break;
-                }
             }
-        }
 
-    size_t lowest = SIZE_MAX;
     for (size_t i = 0; i < seed_count; ++i)
         if (lowest > seeds[i].value) lowest = seeds[i].value;
-
 #else
 
-    size_t lowest = SIZE_MAX;
     for (size_t s = 0; s < seed_count; ++s)
     {
         size_t* seeds_range = malloc(seeds[s].range * sizeof(size_t));
@@ -128,19 +119,12 @@ int main(void)
             seeds_range[ts] = seeds[s].value + ts;
 
             for (int st = 0; st <= step; ++st)
-            {
-                int unchanged = 1;
-
-                for (int m = 0; m < mapping_count && unchanged; ++m)
+                for (int m = 0; m < mapping_count; ++m)
                 {
                     if (mapping[m].step != st) continue;
                     if (map_number(seeds_range + ts, mapping + m))
-                    {
-                        unchanged = 0;
                         break;
-                    }
                 }
-            }
         }
         for (size_t i = 0; i < seeds[s].range; ++i)
                 if (lowest > seeds_range[i]) lowest = seeds_range[i];
