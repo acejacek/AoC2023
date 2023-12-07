@@ -36,7 +36,7 @@ int compare_cards(char* p, char* q)
     return t2 - t1;
 }
 
-// compare function, which is qsort compatibile
+// compare function, which is qsort-compatible
 int compare_hands(const void * a, const void * b)
 {
     Hand* p = (Hand*) a;
@@ -46,7 +46,7 @@ int compare_hands(const void * a, const void * b)
     if (p->type < q->type) return 1;    
     if (p->type > q->type) return -1;
 
-    // if equal type, check on first cards
+    // if equal type, compare cards until diff
     int res = 0;
     for (int i = 0; i < 6; ++i)
     {
@@ -57,13 +57,12 @@ int compare_hands(const void * a, const void * b)
     return res;
 }
 
-void sort_hands(Hand* h, const int i)
+void sort_hands(Hand* hands, const size_t i)
 {
-    qsort(h, (size_t) i, sizeof(Hand), &compare_hands);
+    qsort(hands, i, sizeof(Hand), &compare_hands);
 }
 
-
-// universal function, which search n identical cards in hand
+// universal function, which searches n identical cards in hand
 int has_n(Hand* h, const int n)
 {
 #if PART == 1
@@ -86,7 +85,7 @@ int has_n(Hand* h, const int n)
         if (c == n)
         {
             // remove found cards from hand, so lower level search will not
-            // find it again
+            // find them again
             for (int j = 0; j < 6; ++j)
             {
                 if (h->cards[j] == *cards) h->cards[j] = '.';
@@ -148,11 +147,6 @@ int has_pair(Hand* h)
     return 0;
 }
 
-void has_high(Hand* h)
-{
-    h->type = HIGH_CARD;
-}
-
 int main(void)
 {
     Hand* hands = NULL;
@@ -180,7 +174,7 @@ int main(void)
 
         sscanf(line, "%s %zu", hands[h].cards, &hands[h].bid);
 
-        hands[h].type = HIGH_CARD;  // assume, there is no special set in hand
+        hands[h].type = HIGH_CARD;  // assume, there is nothing special in hand
 
         for (int i = 0; i < 6; ++i)
             hands[h].backup[i] = hands[h].cards[i]; // needed for scoring and sorting
