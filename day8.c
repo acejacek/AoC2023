@@ -19,6 +19,7 @@ typedef struct
     size_t distance;
 } Ghost;
 
+// returns index of address in elements array
 size_t search_element(Element* elements, const size_t count, const char* address)
 {
     for (size_t i = 0; i < count; ++i)
@@ -66,7 +67,7 @@ int main(void)
     sscanf(line, "%s", instructions);
     int instr_len = strlen(instructions);
 
-    int current_instr = 0;
+    int current_instr;
     size_t steps = 0;
     size_t count;
 
@@ -90,7 +91,7 @@ int main(void)
     fclose(input);
  
     // calculate indexes to speed up walking
-    for (int i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         elements[i].i_left = search_element(elements, count, elements[i].left);
         elements[i].i_right = search_element(elements, count, elements[i].right);
@@ -98,8 +99,9 @@ int main(void)
 
     // part 1
     size_t zzz_index = search_element(elements, count, "ZZZ");
-    
-    for (size_t index = search_element(elements, count, "AAA"); index != zzz_index; ++current_instr)
+    size_t index = search_element(elements, count, "AAA");
+
+    for (current_instr = 0; index != zzz_index; ++current_instr)
     {
         if (current_instr == instr_len) current_instr = 0;
 
@@ -143,9 +145,9 @@ int main(void)
                 ghosts[i].index = elements[ghosts[i].index].i_left;
         }
 
-        // bruteforde would take years
+        // brute forte would take years
         // instead, calculate steps by least common multiple
-        // of all ghosts distances
+        // of all ghost's distances
         // https://en.wikipedia.org/wiki/Least_common_multiple
 
         // record distance as LCM with distance of previous ghost
