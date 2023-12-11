@@ -176,7 +176,7 @@ void walk_pipe(Maze* maze, size_t x, size_t y)
     }
 
     // checks which moves are possible
-    // continue resursivelly when direction works OK
+    // continue recursively when direction works OK
 
     // up
     if (is_compatible(pipe, get_pipe(maze, x, y - 1), UP))
