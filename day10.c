@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#define INPUT_FILE "day10.test"
+#define INPUT_FILE "day10.txt"
 
 typedef enum { UP, LEFT, DOWN, RIGHT } Direction;
 
@@ -10,8 +9,6 @@ typedef struct
 {
     char shape;
     unsigned char visited;
-    unsigned char enclosed;
-    
 } Pipe;
 
 typedef struct
@@ -22,8 +19,12 @@ typedef struct
     size_t size;
     size_t solved;
     size_t steps;
+    size_t prev_x;
+    size_t prev_y;
+    int area;
 } Maze;
 
+// returns 1 if movement in dir from shape a to b is possible
 int is_compatible(char a, char b, Direction dir)
 {
     switch(a)
@@ -85,16 +86,23 @@ int is_compatible(char a, char b, Direction dir)
     return 0;
  }
 
-int is_possible(Maze* maze, size_t x, size_t y)
+int is_possible(Maze* maze, int x, int y)
 {
-    if (x == maze->width || x < 0 || y == maze->height || y < 0) return 0;
+    // out of bounds
+    if (x == (int)maze->width || x < 0 || y == (int)maze->height || y < 0) return 0;
 
     int index = y * maze->width + x;
 
+    if (maze->pipes[index].shape == 'S' && // block return to start
+        maze->steps < 3)                  // when only if few steps are done.
+                                          // this prevents ugly edge-case when
+                                          // walker tries to go one step back
+                                          // directly to start position
+        return 0;
+
     // this place was already visited
     if (maze->pipes[index].visited &&
-        maze->pipes[index].shape != 'S')  // allow return to start
-        return 0;
+        maze->pipes[index].shape != 'S') return 0;
 
     return 1;
 }
@@ -109,6 +117,13 @@ char get_pipe(Maze* maze, size_t x, size_t y)
 
 void walk_pipe(Maze* maze, size_t x, size_t y)
 {
+    // calculate 2x area with
+    // https://web.archive.org/web/20100405070507/http://valis.cs.uiuc.edu/~sariel/research/CG/compgeom/msg00831.html
+    maze->area += maze->prev_x * y;
+    maze->area -= maze->prev_y * x;
+    maze->prev_x = x;
+    maze->prev_y = y;
+
     int index = y * maze->width + x;
     
     // back to start position! Found loop!
@@ -126,7 +141,9 @@ void walk_pipe(Maze* maze, size_t x, size_t y)
 
     if (pipe == 'S')
     {
-       char t;
+        // at the start determine which moves are possible,
+        // pick first that fits
+        char t;
         // up
         t = get_pipe(maze, x, y - 1);
         if (t == '|' || t == 'F' || t == '7')
@@ -155,7 +172,11 @@ void walk_pipe(Maze* maze, size_t x, size_t y)
             walk_pipe(maze, x - 1, y);
             return;
         }
+        printf("Can't start!\n");
     }
+
+    // checks which moves are possible
+    // continue resursivelly when direction works OK
 
     // up
     if (is_compatible(pipe, get_pipe(maze, x, y - 1), UP))
@@ -171,75 +192,24 @@ void walk_pipe(Maze* maze, size_t x, size_t y)
         walk_pipe(maze, x - 1, y);
 }
 
-size_t search_maze(Maze* maze)
+void search_maze(Maze* maze)
 {
+    // search for Start and begin a walk.
+    // Walk should result with maze->solved
     for (size_t i = 0; i < maze->size; ++i)
         if (maze->pipes[i].shape == 'S')
         {
             size_t x = i % maze->width;
             size_t y = i / maze->width;
+            maze->prev_x = x;
+            maze->prev_y = y;
             walk_pipe(maze, x, y);
-            if (maze->solved == 1) return maze->steps / 2;
+            if (maze->solved == 1) return;
         }
 
     printf("Can't find loop");
-    return 0;
+    return;
 }
-
-
-unsigned char is_visited(Maze* maze, size_t x, size_t y)
-{
-    int index = y * maze->width + x;
-    return maze->pipes[index].visited | maze->pipes[index].enclosed;
-}
-
-unsigned int mark_enclosed(Maze* maze, size_t x, size_t y)
-{
-    if (x == 0 || y == 0 || x == maze->width - 1 || y == maze->height - 1)
-        return 0; // reached edge, not encircled
-
-    if (is_visited(maze, x, y)) return 0;
-    int index = y * maze->width + x;
-    unsigned int enclosed = 1;
-    maze->pipes[index].enclosed = enclosed;
-    
-    if (! is_visited(maze, x, y - 1))
-        enclosed = mark_enclosed(maze, x, y - 1);
-    if (! is_visited(maze, x, y + 1))
-        enclosed += mark_enclosed(maze, x, y + 1);
-    if (! is_visited(maze, x - 1, y))
-        enclosed += mark_enclosed(maze, x - 1, y);
-    if (! is_visited(maze, x + 1, y))
-        enclosed += mark_enclosed(maze, x + 1, y);
-
-    enclosed &= 1;
-
-    maze->pipes[index].enclosed = enclosed;
-
-    for (int i = 0; i < maze->size; ++i)
-    {
-        if (i % maze->width == 0) putchar('\n');
-        printf("%c", maze->pipes[i].enclosed+48);
-    }
-    putchar('\n');
-    return enclosed;
-}
-
-size_t count_eclosed(Maze* maze)
-{
-    for (size_t y = 1; y < maze->height - 1; ++y)
-        for (size_t x = 1; x < maze->width - 1; ++x)
-            mark_enclosed(maze, x, y);
-
-    size_t sum = 0;
-
-    for (size_t i = 0; i < maze->size; ++i)
-    {
-        sum += maze->pipes[i].enclosed;
-    }
-    return sum;
-}
-
 
 int main(void)
 {
@@ -262,9 +232,11 @@ int main(void)
     maze.width = 0;
     maze.height = 0;
     maze.steps = 0;
+    maze.area = 0;
 
-    for (maze.height = 1;((read = getline(&line, &len, input)) != -1); maze.height++)
+    while ((read = getline(&line, &len, input)) != -1)
     {
+        maze.height++;
         maze.width = read - 1;
 
         maze.pipes = (Pipe*) realloc(maze.pipes, (maze.size + maze.width) * sizeof(Pipe));
@@ -275,36 +247,22 @@ int main(void)
             exit(EXIT_FAILURE);
         }
 
-        for (int i = 0; i < maze.width; ++i)
+        for (size_t i = 0; i < maze.width; ++i)
         {
             maze.pipes[maze.size + i].shape = line[i];
             maze.pipes[maze.size + i].visited = 0;
-            maze.pipes[maze.size + i].enclosed = 0;
         }
         
         maze.size += maze.width;
     }
     fclose(input);
 
-    for (int i = 0; i < maze.size; ++i)
-    {
-        if (i % maze.width == 0) putchar('\n');
-        printf("%c", maze.pipes[i].shape);
-    }
-    putchar('\n');
+    search_maze(&maze);
+    printf("Steps: %zu\n", maze.steps / 2);
 
-
-    size_t res = search_maze(&maze);
-    printf("Steps: %zu\n", res);
-
-    res = count_eclosed(&maze);
-    printf("Enclosed: %zu\n", res);
-    for (int i = 0; i < maze.size; ++i)
-    {
-        if (i % maze.width == 0) putchar('\n');
-        printf("%c", maze.pipes[i].enclosed+48);
-    }
-    putchar('\n');
+    // https://en.wikipedia.org/wiki/Pick%27s_theorem
+    int i = abs(maze.area / 2) - (maze.steps / 2) + 1;
+    printf("Integer points interior to the polygon: %d\n", i);
 
     free(maze.pipes);
     return 0;
