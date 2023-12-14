@@ -7,7 +7,7 @@
 // change for part 2
 #define PART 2
 
-#define PATTERN 30
+#define PATTERN 100
 
 typedef struct
 {
@@ -99,12 +99,9 @@ void cycle(Rocks* r)
     do { // west
         sum = 0;
         for (int x = 1; x < r->width; ++x)
-            for (int y = 0; y < r->width * (r->height - 1); ++y)
-            {
-                sum += shift_stone(r, y * r->width + x, -1);
-            }
+            for (int y = 0; y < r->height - 1; ++y)
+                sum += shift_stone(r, y * r->width + x, (-1));
     } while (sum != 0);
-
     do { // south
         sum = 0;
         for (int i = 0; i < r->width * (r->height - 1); ++i)
@@ -116,15 +113,16 @@ void cycle(Rocks* r)
     do { // east
         sum = 0;
         for (int x = 0; x < r->width - 1; ++x)
-            for (int y = 0; y < r->width * (r->height - 1); ++y)
+            for (int y = 0; y < r->height - 1; ++y)
                 sum += shift_stone(r, y * r->width + x, 1);
 
     } while (sum != 0);
 }
 
+// https://en.wikipedia.org/wiki/Cycle_detection#Tortoise_and_hare
 int check_pattern(Rocks* r)
 {
-    int tortoise = 10;
+    int tortoise = 1;
     int hare = tortoise + 1;
     while (r->pattern[tortoise] != r->pattern[hare])
     {
@@ -132,23 +130,25 @@ int check_pattern(Rocks* r)
         hare += 2;
         if (hare >= PATTERN)
         {
-            printf("Cant find start\n");
+            printf("Can't find position v\n");
             return 0;
         }
     }
+
     r->pattern_mu = 0;
     tortoise = 0;
     while (r->pattern[tortoise] != r->pattern[hare])
     {
+        r->pattern_mu++;
         tortoise++;
         hare++;
-        r->pattern_mu++;
 
         if (hare >= PATTERN)
         {
-            printf("Cant find start\n");
+            printf("Can't find mu\n");
             return 0;
         }
+        printf("%d %d \n",r->pattern[tortoise], r->pattern[hare]);
     }
     r->pattern_lam = 1;
     hare = tortoise + 1;
@@ -158,7 +158,7 @@ int check_pattern(Rocks* r)
         hare++;
         if (hare >= PATTERN)
         {
-            printf("Cant find start\n");
+            printf("Cant find min lamda\n");
             return 0;
         }
     }
@@ -171,6 +171,9 @@ int main(void)
     r.rocks = NULL;
     for (int i = 0; i < PATTERN; ++i)
         r.pattern[i] = 0;
+
+    for (int i = 0; i < PATTERN; ++i)
+        printf("%d ", r.pattern[i]);
 
     const char filename[] = INPUT_FILE;
     FILE* input = fopen(filename, "r");
@@ -199,22 +202,31 @@ int main(void)
     }
     fclose(input);
 
+    print_rocks(&r);
 #if PART == 1
-//    tilt(&r);
+
+    tilt(&r);
     int sum = weight(&r);
     printf("Sumarized weight: %d\n", sum);
+
 #else
 
-    for (size_t i = 0; i < 100; ++i)
+    for (size_t i = 0; i < PATTERN; ++i)
     {
         cycle(&r);
         r.pattern[i] = weight(&r);
+//        printf("%d ",r.pattern[i]);
     }
+putchar('\n');
+
+    for (int i = 0; i < PATTERN; ++i)
+        printf("%d ", r.pattern[i]);
+putchar('\n');
 
     if (check_pattern(&r))
     {
         printf("Found repetition %d, %d\n ",r.pattern_mu, r.pattern_lam);
-        size_t offset = (10000 - r.pattern_mu) % r.pattern_lam;
+        size_t offset = ((1000000000l - (size_t)r.pattern_mu) % r.pattern_lam) + r.pattern_mu;
         printf("Result: %d\n", r.pattern[offset]);
     }
 #endif
