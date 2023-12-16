@@ -2,12 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INPUT_FILE "day14.test"
+#define INPUT_FILE "day14.txt"
 
 // change for part 2
 #define PART 2
 
-#define PATTERN 100
+#define PATTERN 500
 
 typedef struct
 {
@@ -18,22 +18,6 @@ typedef struct
     int pattern_mu;
     int pattern_lam;
 } Rocks;
-
-int shift_stone_north(Rocks* r, int i)
-{
-    if (r->rocks[i] != 'O') return 0; // I can move only rounded rocks
-
-    int j = i - r->width; //index of new position
-    
-    if (r->rocks[j] == '.')
-    {
-        r->rocks[j] = 'O';
-        r->rocks[i] = '.';
-        return 1;
-    }
-
-    return 0;
-}
 
 int shift_stone(Rocks* r, int i, int k)
 {
@@ -64,105 +48,105 @@ int weight(Rocks*r)
     return sum;
 }
 
-int tilt(Rocks* r)
+void tilt(Rocks* r)
 {
     int sum;
     do {
         sum = 0;
         for (int i = r->width; i < r->width * r->height; ++i)
-            sum += shift_stone_north(r, i);
+            sum += shift_stone(r, i, -r->width);
     }
     while (sum != 0);
 }
 
-void print_rocks(Rocks* r)
-{
-    for (int i = 0; i < r->height * r->width; ++i)
-    { 
-        if (i % r->width == 0) putchar('\n');
-        putchar(r->rocks[i]);
-    }
-    putchar('\n');
-}
-
 void cycle(Rocks* r)
 {
+//    static int c = 0; if (c++ == 4) exit(1);
     int sum;
     do {  // north
         sum = 0;
         for (int i = r->width; i < r->width * r->height; ++i)
-        {
             sum += shift_stone(r, i, -r->width);
-        }
     } while (sum != 0);
 
     do { // west
         sum = 0;
         for (int x = 1; x < r->width; ++x)
-            for (int y = 0; y < r->height - 1; ++y)
+            for (int y = 0; y < r->height; ++y)
                 sum += shift_stone(r, y * r->width + x, (-1));
     } while (sum != 0);
+
     do { // south
         sum = 0;
         for (int i = 0; i < r->width * (r->height - 1); ++i)
-        {
             sum += shift_stone(r, i, r->width);
-        }
     } while (sum != 0);
 
     do { // east
         sum = 0;
         for (int x = 0; x < r->width - 1; ++x)
-            for (int y = 0; y < r->height - 1; ++y)
+            for (int y = 0; y < r->height; ++y)
                 sum += shift_stone(r, y * r->width + x, 1);
-
     } while (sum != 0);
 }
 
-// https://en.wikipedia.org/wiki/Cycle_detection#Tortoise_and_hare
+/*
+ * bruteforce would take ages
+ * instead, find repetability in results and calculate:
+ * mu - from when repetition stars
+ * lam - what's the repetition period is
+ * I expect results will look like this:
+ *
+ *    ##
+ *   #  #  #  #  #  #
+ *  #    ## ## ## ## ##.....
+ * #    ^__^
+ *      | \
+ *     mu  lam
+ */
 int check_pattern(Rocks* r)
 {
-    int tortoise = 1;
-    int hare = tortoise + 1;
-    while (r->pattern[tortoise] != r->pattern[hare])
+    int inter[100] = { 0 };
+    int ind = 0;
+    int sign = 1;
+    int old_sign = sign;
+    // built table with intervals between peaks
+    
+    for (int i = 0; i < PATTERN; ++i)
     {
-        tortoise++;
-        hare += 2;
-        if (hare >= PATTERN)
+        int delta = r->pattern[i + 1] - r->pattern[i];
+        if (delta > 0) sign = 1;
+        else sign = -1;
+
+        if (old_sign != sign)
         {
-            printf("Can't find position v\n");
-            return 0;
+            inter[ind++] = i;
+            old_sign = sign;
         }
     }
 
-    r->pattern_mu = 0;
-    tortoise = 0;
-    while (r->pattern[tortoise] != r->pattern[hare])
+    // now find arbitrary 10 equal distances
+    for (int i = 0; i < ind - 10; ++i)
     {
-        r->pattern_mu++;
-        tortoise++;
-        hare++;
-
-        if (hare >= PATTERN)
+        int is_equal = 1;
+        int delta = inter[i + 2] - inter[i];
+        for (int j = 1; j < 10; ++j)
         {
-            printf("Can't find mu\n");
-            return 0;
+            if (inter[i + j + 2] - inter[i + j] != delta)
+            {
+                is_equal = 0;
+                break;
+            }
         }
-        printf("%d %d \n",r->pattern[tortoise], r->pattern[hare]);
-    }
-    r->pattern_lam = 1;
-    hare = tortoise + 1;
-    while (r->pattern[tortoise] != r->pattern[hare])
-    {
-        r->pattern_lam++;
-        hare++;
-        if (hare >= PATTERN)
+        if (is_equal)
         {
-            printf("Cant find min lamda\n");
-            return 0;
+            r->pattern_mu = inter[i];
+            r->pattern_lam = inter[i + 2] - inter[i];
+            return 1;
         }
     }
-    return 1;
+    // not found
+    return 0;
 }
 
 int main(void)
@@ -171,9 +155,6 @@ int main(void)
     r.rocks = NULL;
     for (int i = 0; i < PATTERN; ++i)
         r.pattern[i] = 0;
-
-    for (int i = 0; i < PATTERN; ++i)
-        printf("%d ", r.pattern[i]);
 
     const char filename[] = INPUT_FILE;
     FILE* input = fopen(filename, "r");
@@ -202,7 +183,6 @@ int main(void)
     }
     fclose(input);
 
-    print_rocks(&r);
 #if PART == 1
 
     tilt(&r);
@@ -215,20 +195,15 @@ int main(void)
     {
         cycle(&r);
         r.pattern[i] = weight(&r);
-//        printf("%d ",r.pattern[i]);
     }
-putchar('\n');
-
-    for (int i = 0; i < PATTERN; ++i)
-        printf("%d ", r.pattern[i]);
-putchar('\n');
 
     if (check_pattern(&r))
     {
-        printf("Found repetition %d, %d\n ",r.pattern_mu, r.pattern_lam);
-        size_t offset = ((1000000000l - (size_t)r.pattern_mu) % r.pattern_lam) + r.pattern_mu;
-        printf("Result: %d\n", r.pattern[offset]);
+//        printf("Found repetition %d, %d\n",r.pattern_mu, r.pattern_lam);
+        size_t offset = ((1000000000l - r.pattern_mu) % r.pattern_lam) + r.pattern_mu;
+        printf("Result: %d\n", r.pattern[offset - 1]);
     }
+    else printf("Can't find soultion. Change parameters.\n"); 
 #endif
 
     free(r.rocks);
