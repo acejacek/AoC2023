@@ -141,8 +141,6 @@ int main(void)
     }
 
     Pattern pattern = { NULL, 0, 0 };
-    int height = 0;
-    int width;
 
     char* line = NULL;
     size_t len = 0;
