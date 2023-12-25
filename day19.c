@@ -2,21 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INPUT_FILE "day19.test"
+#define INPUT_FILE "day19.txt"
 
 typedef struct
 {
   int min;
   int max;
 } Range;
-
-typedef struct
-{
-  int x[4000];
-  int m[4000];
-  int a[4000];
-  int s[4000];
-} Master;
 
 typedef struct Part
 {
@@ -109,8 +101,9 @@ int process(Part* part, Workflow* workflow, int r)
   return result;
 }
 
-void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Range a, Range s)
+size_t process_range(Workflow* workflow, int r, Range x, Range m, Range a, Range s)
 {
+  size_t result = 0;
   int success = 0;
   int t = workflow->rule[r].treshold;
   switch (workflow->rule[r].comp)
@@ -120,18 +113,18 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
       {
         case 'x':
           if (x.min > t) success = 1;      // all range is greater than treshold
-          else if (x.max > t) // upper part
+          else if (x.max > t)    // only upper part
           {
             // prepare new range and inject it here recursively, so it will pass
-            process_range(workflow, r, mask, (Range){t + 1, x.max}, m, a, s);
+            result += process_range(workflow, r, (Range){t + 1, x.max}, m, a, s);
             x.max = t; // truncate remaining part for further processing.
           }
           break;
         case 'm':
           if (m.min > t) success = 1;
-          else if (m.max > t)              // upper part
+          else if (m.max > t)
           {
-            process_range(workflow, r, mask, x,(Range){t + 1, m.max}, a, s);
+            result += process_range(workflow, r, x,(Range){t + 1, m.max}, a, s);
             m.max = t;
           }
           break;
@@ -139,7 +132,7 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
           if (a.min > t) success = 1;
           else if (a.max > t)
           {
-            process_range(workflow, r, mask, x, m, (Range){t + 1, a.max}, s);
+            result += process_range(workflow, r, x, m, (Range){t + 1, a.max}, s);
             a.max = t;
           }
           break;
@@ -147,7 +140,7 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
           if (s.min > t) success = 1;
           else if (s.max > t)
           {
-            process_range(workflow, r, mask, x, m, a, (Range){t + 1, s.max});
+            result += process_range(workflow, r, x, m, a, (Range){t + 1, s.max});
             s.max = t;
           }
           break;
@@ -160,7 +153,7 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
           if (x.max < t) success = 1;
           else if (x.min < t)
           {
-            process_range(workflow, r, mask, (Range){x.min, t - 1}, m, a, s);
+            result += process_range(workflow, r, (Range){x.min, t - 1}, m, a, s);
             x.min = t;
           }
           break;
@@ -168,7 +161,7 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
           if (m.max < t) success = 1;
           else if (m.min < t)
           {
-            process_range(workflow, r, mask, x, (Range){m.min, t - 1}, a, s);
+            result += process_range(workflow, r, x, (Range){m.min, t - 1}, a, s);
             m.min = t;
           }
           break;
@@ -176,7 +169,7 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
           if (a.max < t) success = 1;
           else if (a.min < t)
           {
-            process_range(workflow, r, mask, x, m, (Range){a.min, t - 1}, s);
+            result += process_range(workflow, r, x, m, (Range){a.min, t - 1}, s);
             a.min = t;
           }
           break;
@@ -184,7 +177,7 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
           if (s.max < t) success = 1;
           else if (s.min < t)
           {
-            process_range(workflow, r, mask, x, m, a, (Range){s.min, t - 1});
+            result += process_range(workflow, r, x, m, a, (Range){s.min, t - 1});
             s.min = t;
           }
           break;
@@ -196,29 +189,22 @@ void process_range(Workflow* workflow, int r, Master* mask, Range x, Range m, Ra
     default:
       printf("Unknown case");
   }
-  if (! success) process_range(workflow, r + 1, mask, x, m, a, s); // process next rule
+
+  if (! success) result += process_range(workflow, r + 1, x, m, a, s); // process next rule
   else
   {
-    if (workflow->rule[r].destination[0] == 'R') return;
-    if (workflow->rule[r].destination[0] == 'A')
+    if (workflow->rule[r].destination[0] == 'R') return 0;   // dump into sink
+    if (workflow->rule[r].destination[0] == 'A')             // accept
     {
-      
-      //return ipow(ipow(ipow(x.max - x.min + 1, m.max - m.min + 1), a.max - a.min + 1), s.max - s.min + 1);
-      //result += (x.max - x.min + 1) * (m.max - m.min + 1) * (a.max - a.min + 1) * (s.max - s.min + 1);
-      for (int i = 1; i <= 4000; ++i)
-      {
-        if (x.min <= i && i <= x.max) mask->x[i - 1] = 1;
-        if (m.min <= i && i <= m.max) mask->m[i - 1] = 1;
-        if (a.min <= i && i <= a.max) mask->a[i - 1] = 1;
-        if (s.min <= i && i <= s.max) mask->s[i - 1] = 1;
-      }
-      return;
+      result += (size_t)(x.max - x.min + 1) * (size_t)(m.max - m.min + 1) * (size_t)(a.max - a.min + 1) * (size_t)(s.max - s.min + 1);
+      return result;
     }
-
-    process_range(workflow->rule[r].dest_prt, 0, mask, x, m, a, s); // follow next workflow
+    // destination is next rule
+    result += process_range(workflow->rule[r].dest_prt, 0, x, m, a, s); // follow next workflow
   }
-  return;
+  return result;
 }
+
 int main(void)
 {
   const char filename[] = INPUT_FILE;
@@ -252,7 +238,6 @@ int main(void)
     int r = 0;
     c = strtok(NULL, "{}\n");
     strcpy(rules, c);
-//    printf("Flow: %s, rules %s\n", workflow[i].name, rules);
     c = strtok(rules, ",");
     do {
       switch(c[1])
@@ -312,20 +297,12 @@ int main(void)
 
   for (int n = 0; n < i; ++n)
   {
-//    printf("Flow: %s, %d rules:\n", workflow[n].name, workflow[n].r);
     for (int m = 0; m < workflow[n].r; ++m)
     {
       int index = find_workflow(workflow, i, workflow[n].rule[m].destination);
       if (index != -1) workflow[n].rule[m].dest_prt = workflow + index;
-//      printf("cat: %c, crit: %c, treshold: %d, dest: %s ptr: %p\n",
-//          workflow[n].rule[m].category, workflow[n].rule[m].comp,
-//          workflow[n].rule[m].treshold, workflow[n].rule[m].destination,
-//          (void*)workflow[n].rule[m].dest_prt);
     }
   }
-
-//  for (int n = 0; n < p; ++n)
-//    printf("x: %d, m: %d, a: %d, s: %d\n", part[n].x, part[n].m, part[n].a, part[n].s);
 
   // work out all parts
   int start = find_workflow(workflow, i, "in");
@@ -338,36 +315,8 @@ int main(void)
 
   printf("Result part 1: %zu\n", score); 
 
-  Master mask = { 0 };
-  for (int i = 0; i < 4000; ++i)
-  {
-    mask.x[i] = 0;
-    mask.m[i] = 0;
-    mask.a[i] = 0;
-    mask.s[i] = 0;
-  }
-    
   Range r = {1, 4000};
-
-  process_range(workflow + start,  0, &mask, r, r, r, r);
-
-  score = 1;
-  size_t partial = 0;
-  for (int i = 0; i < 4000; ++i)
-    if (mask.x[i] != 0) partial++;
-  score *= partial;
-   partial = 0;
-  for (int i = 0; i < 4000; ++i)
-    if (mask.m[i] != 0) partial++;
-  score *= partial;
-   partial = 0;
-  for (int i = 0; i < 4000; ++i)
-    if (mask.a[i] != 0) partial++;
-  score *= partial;
-   partial = 0;
-  for (int i = 0; i < 4000; ++i)
-    if (mask.s[i] != 0) partial++;
-  score *= partial;
+  score = process_range(workflow + start,  0, r, r, r, r);
 
   printf("Result part 2: %zu\n", score); 
 
