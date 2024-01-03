@@ -7,20 +7,22 @@
 // change for part 2
 #define PART 2
 
-enum type {UNSPEC, FLIPFLOP, CONJUNCTION };
+typedef enum { UNSPEC, FLIPFLOP, CONJUNCTION } Type;
 
 typedef struct input
 {
     int status;
-    int cycle;
     int ID;
+#if PART == 2
+    size_t cycle;
+#endif
 } Input;
 
 typedef struct module
 {
     char name[12];
-    enum type type;
-    char output[20][20];   // [FIXME] hard limit of outputs
+    Type type;
+    char output[20][20];   // [FIXME] hard limits here and there
     int status;
     Input inputs[20]; 
     int i_count;
@@ -29,7 +31,7 @@ typedef struct module
     int ID;
 } Module;
 
-// cariess message 
+// caries message 
 typedef struct signal
 {
     int value;
@@ -38,6 +40,7 @@ typedef struct signal
     struct signal* next;
 } Signal;
 
+// queue of signals
 typedef struct queue
 {
     Signal* head;
@@ -47,7 +50,7 @@ typedef struct queue
     size_t counter_low;
 #else
     Module* parent;
-    int cycle;
+    size_t cycle;
 #endif
 } Queue;
 
@@ -64,35 +67,37 @@ void init_queue(Queue* q)
 #endif
 }
 
-int enqueue(Queue* q, Module* from, Module* to, int value)
+int enqueue(Queue* q, Module* from, Module* to, const int value)
 {
-    if (to) // don't enqueue signals to final nodes (NULL)
+    Signal* new_signal = malloc(sizeof(Signal));
+    if (! new_signal)
     {
-        Signal* new_signal = malloc(sizeof(Signal));
-        if (! new_signal) return 0;
-
-        new_signal->from = from;
-        new_signal->to = to;
-        new_signal->value = value;
-        new_signal->next = NULL;
-
-        if (q->tail) q->tail->next = new_signal;
-        q->tail = new_signal;
-
-        if (q->head == NULL) q->head = new_signal;
+        fprintf(stderr, "Error with queue\n");
+        return 1;
     }
+
+    new_signal->from = from;
+    new_signal->to = to;
+    new_signal->value = value;
+    new_signal->next = NULL;
+
+    if (q->tail) q->tail->next = new_signal;
+    q->tail = new_signal;
+
+    if (q->head == NULL) q->head = new_signal;
 
 #if PART == 1
     if (value == 1) ++q->counter_high;
     else ++q->counter_low;
 #endif
 
+// for visualization
 //     if (from)
 //     printf("%s -%d-> %s\n", from->name, value, to->name);
 //     else
 //     printf("button -%d-> %s\n", value, to->name);
 
-    return 1;
+    return 0;
 }
 
 Signal dequeue(Queue* q)
@@ -109,7 +114,8 @@ Signal dequeue(Queue* q)
     return result; 
 }
 
-Module* find_module(Module* m, int i, char* name)
+// returns pointer to module with given name
+Module* find_module(Module* m, const int i, const char* name)
 {
     for (int j = 0; j < i; ++j)
         if (strcmp(name, m[j].name) == 0) return m + j;
@@ -117,7 +123,8 @@ Module* find_module(Module* m, int i, char* name)
     return NULL;
 }
 
-Module* find_rx_parent(Module* m, int i)
+// returns pointer to parent of RX module
+Module* find_rx_parent(Module* m, const int i)
 {
     for (int j = 0; j < i; ++j)
         for (int k = 0; k < m[j].o_count; ++k)
@@ -127,8 +134,9 @@ Module* find_rx_parent(Module* m, int i)
 }
 
 // create pointers to output modules
-int update_outputs(Module* m, int i)
+int update_outputs(Module* m, int* count)
 {
+    int i = *count;   // count of modules can change if we add extra outputs, hence by reference
     for (int j = 0; j < i; ++j)
         for (int k = 0; k < m[j].o_count; ++k)
             if ((m[j].output_p[k] = find_module(m, i, m[j].output[k])) != NULL)  // find all the outputs
@@ -145,8 +153,8 @@ int update_outputs(Module* m, int i)
                 m = realloc(m, (i + 1) * sizeof(Module));
                 if (! m)
                 {
-                    fprintf(stderr, "Can't allocate memory.\n");
-                    return EXIT_FAILURE;
+                    fprintf(stderr, "Can't allocate memory for additional modules.\n");
+                    return 1;
                 }
 
                 m[i].type = UNSPEC;
@@ -159,7 +167,8 @@ int update_outputs(Module* m, int i)
                 m[j].output_p[k] = m + i;  // now when module is created, update parent
                 ++i;
             }
-    return EXIT_SUCCESS;
+    *count = i; // update back to main new module count
+    return 0;
 }
 
 // greatest common divisor
@@ -197,10 +206,10 @@ int main(void)
     char* line = NULL;
     size_t len = 0;
 
-    int i = 0;
-    while (getline(&line, &len, input) > 2)
+    int i;
+    for (i = 0; getline(&line, &len, input) > 2; ++i)
     {
-        module = realloc(module, (i + 1) * sizeof(Module));
+        module = realloc(module, (i + 1) * sizeof(*module));
         if (! module)
         {
             fprintf(stderr, "Can't allocate memory.\n");
@@ -236,61 +245,64 @@ int main(void)
             module[i].o_count++;
         }
         while ((d = strtok(NULL, ", \n")) != NULL);
-
-        i++;
     }
 
-    update_outputs(module, i);
+    if (update_outputs(module, &i))
+    {
+        exit_status = EXIT_FAILURE;
+        goto dispose;
+    }
 
     Queue q;
     init_queue(&q);
-    int loop = 0;
 
 #if PART == 1
-    for (; loop < 4; ++loop)
-    {
+    for (int loop = 0; loop < 1000; ++loop)
 #else
     q.parent = find_rx_parent(module, i);
-    printf("parent %s\n", q.parent->name);
-
-    for (;; ++loop)
+    if (q.parent == NULL)
     {
-        int found = 1;
-        for (int j = 0; j < q.parent->i_count; ++j)
-            if (q.parent->inputs[j].cycle == 0)
-            {
-                found = 0;
-                break;
-            }
-        if (found) break;
+        fprintf(stderr, "Can't find parent module to RX\n");
+        exit_status = EXIT_FAILURE;
+        goto dispose;
+    }
 
-        q.cycle = loop + 1; 
+    int found = 0;
+    for (q.cycle = 1; ! found; ++q.cycle)
 #endif
+    {
         // button sends low message to broadcaster
-//        printf("Button press \n");
-        enqueue(&q, NULL, find_module(module, i, "broadcaster"), 0);
-
-        Signal s;
-        for (s = dequeue(&q); s.from != NULL || s.to !=NULL; s = dequeue(&q))
+        if (enqueue(&q, NULL, find_module(module, i, "broadcaster"), 0))
         {
-            enum type type = UNSPEC;
-            if (s.to != NULL)
-                type = s.to->type;
+            exit_status = EXIT_FAILURE;
+            goto dispose;
+        }
 
-            switch(type)
+        // process until queue is empty
+        do {
+            Signal s = dequeue(&q);
+            switch(s.to->type)
             {
-                case FLIPFLOP:
-                    if (s.value == 0) // ignore high impuls;
-                    {
-                        s.to->status ^= 1;  // flip state;
-                        for (int j = 0; j < s.to->o_count; ++j) // forward state to all outputs
-                            enqueue(&q, s.to, s.to->output_p[j], s.to->status);
-                    }
-                    break;
                 case UNSPEC:
                     // simply forward signal value to all outputs
                     for (int j = 0; j < s.to->o_count; ++j)
-                        enqueue(&q, s.to, s.to->output_p[j], s.value);
+                        if (enqueue(&q, s.to, s.to->output_p[j], s.value))
+                        {
+                            exit_status = EXIT_FAILURE;
+                            goto dispose;
+                        }
+                    break;
+
+                case FLIPFLOP:
+                    if (s.value == 1) break; // ignore high impuls;
+      
+                    s.to->status ^= 1;  // flip state;
+                    for (int j = 0; j < s.to->o_count; ++j) // forward state to all outputs
+                        if (enqueue(&q, s.to, s.to->output_p[j], s.to->status))
+                        {
+                            exit_status = EXIT_FAILURE;
+                            goto dispose;
+                        }
                     break;
 
                 case CONJUNCTION:
@@ -299,10 +311,11 @@ int main(void)
                         if (s.to->inputs[j].ID == s.from->ID)
                         {
                             s.to->inputs[j].status = s.value;
-                            // for part 2 record cycle, when the input get 1
+#if PART == 2
+                            // for part 2 record cycle, when parent module input get 1
                             if (s.to == q.parent && s.value == 1 && s.to->inputs[j].cycle == 0)   
                                 s.to->inputs[j].cycle = q.cycle;
-
+#endif
                             break;
                         }
 
@@ -317,29 +330,42 @@ int main(void)
 
                     // forward status to all outputs
                     for (int j = 0; j < s.to->o_count; ++j)
-                        enqueue(&q, s.to, s.to->output_p[j], s.to->status);
-
+                        if (enqueue(&q, s.to, s.to->output_p[j], s.to->status))
+                        {
+                            exit_status = EXIT_FAILURE;
+                            goto dispose;
+                        }
                     break;
 
                 default:
                     printf("Unknown signal");
-                    break;
+                    exit_status = EXIT_FAILURE;
+                    goto dispose;
             }
-        }
+        } while (q.head != NULL);
+
+#if PART == 2
+        // check, if cycle calculated for all inputs of parent module to RX
+        found = 1;
+        for (int j = 0; j < q.parent->i_count; ++j)
+            if (q.parent->inputs[j].cycle == 0)
+            {
+                found = 0;
+                break;
+            }
+#endif
     }
 
 #if PART == 1
-
     printf("Number of high impulses sent: %zu, low: %zu, total score %zu\n", q.counter_high, q.counter_low, q.counter_high * q.counter_low); 
-
 #else
-
+    // calculate LCM of cycles from all inputs
+    // brute force method will take days
     size_t res = 1;
     for (int j = 0; j < q.parent->i_count; ++j)
-        res = lcm(res, (size_t)q.parent->inputs[j].cycle);
+        res = lcm(res, q.parent->inputs[j].cycle);
         
-    printf("Number of button presses until signal to RX: %zu\n", res); 
-
+    printf("Number of button presses until low signal to RX: %zu\n", res); 
 #endif
 
 dispose:
